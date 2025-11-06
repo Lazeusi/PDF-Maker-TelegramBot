@@ -6,10 +6,12 @@ aiosignal==1.4.0
 annotated-types==0.7.0
 attrs==25.4.0
 certifi==2025.10.5
+colorama==0.4.6
 dnspython==2.8.0
 dotenv==0.9.9
 frozenlist==1.8.0
 idna==3.11
+loguru==0.7.3
 magic-filter==1.0.12
 motor==3.7.1
 multidict==6.7.0
@@ -21,4 +23,5 @@ pymongo==4.15.3
 python-dotenv==1.2.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0
+win32_setctime==1.2.0
 yarl==1.22.0
