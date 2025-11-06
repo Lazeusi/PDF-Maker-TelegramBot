@@ -6,7 +6,9 @@ from aiogram.fsm.state import State, StatesGroup
 from src.database.models.admin import Admin
 from src.database.models.channel import Channel
 from src.keyboards.admin import (admin_keyboard, force_join_keyboard,
-                                 check_channel_type_keyboard)
+                                 check_channel_type_keyboard,
+                                 channel_list , channel_list_show,
+                                 back_to_channel_menu_keyboard)
 from src.logger import log
 
 
@@ -106,3 +108,56 @@ async def handle_private_channel(message: types.Message, state: FSMContext):
     await Channel.add_channel(chat_id=chat.id, title=chat.title, username=chat.username, type="private")
     await message.answer(f"✅ کانال {chat.title} اضافه شد!")
     await state.clear()
+    
+@router.callback_query(F.data == "remove_channel")
+async def remove_channel_handler(callback: types.CallbackQuery):
+    await callback.message.edit_text("لطفا چنلی که میخواهید حذف کنید را انتخاب کنید" , reply_markup=await channel_list())
+    
+class DeleteChannelState(StatesGroup):
+    waiting_for_accept = State()
+    
+@router.callback_query(F.data.startswith("channel_"))
+async def delete_channel_callback(callback: types.CallbackQuery):
+    chat_id = int(callback.data.split("_")[1])
+    await callback.message.edit_text(
+        f"آیا از حذف این کانال مطمئن هستید؟\nChat ID: `{chat_id}`",
+        parse_mode="Markdown",
+        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+            [
+                types.InlineKeyboardButton(text="✅ بله", callback_data=f"confirm_delete_{chat_id}"),
+                types.InlineKeyboardButton(text="❌ خیر", callback_data="back_to_channel_menu")
+            ]
+        ])
+    )
+@router.callback_query(F.data.startswith("confirm_delete_"))
+async def confirm_delete_channel_callback(callback: types.CallbackQuery):
+    chat_id = int(callback.data.split("_")[2])
+    result = await Channel.collection.delete_one({"chat_id": chat_id})
+    if result.deleted_count:
+        await callback.message.edit_text("✅ کانال با موفقیت حذف شد!")
+        
+@router.callback_query(F.data == "list_channels")
+async def list_channels_callback(callback: types.CallbackQuery):
+    await callback.message.edit_text("لیست کانال‌ها:", reply_markup=await channel_list_show())
+    
+@router.callback_query(F.data.startswith("show_channel_"))
+async def show_channel_callback(callback: types.CallbackQuery):
+    chat_id_str = callback.data.replace("show_channel_", "")
+    try:
+        chat_id = int(chat_id_str)
+    except ValueError:
+        return await callback.answer("❌ chat_id نامعتبره", show_alert=True)
+
+    channel = await Channel.collection.find_one({"chat_id": chat_id})
+    if channel:
+        await callback.message.edit_text(
+    f"<b>📡 اطلاعات کانال:</b>\n\n"
+    f"<b>Title:</b> {channel['title']}\n"
+    f"<b>Username:</b> @{channel['username'] if channel.get('username') else 'N/A'}\n"
+    f"<b>Chat ID:</b> <code>{channel['chat_id']}</code>\n"
+    f"<b>Type:</b> {channel['type'].capitalize()}",
+    parse_mode="HTML",
+    reply_markup=back_to_channel_menu_keyboard
+)
+    else:
+        await callback.answer("❌ کانال پیدا نشد!", show_alert=True)
