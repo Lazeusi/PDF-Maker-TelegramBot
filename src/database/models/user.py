@@ -14,6 +14,14 @@ class User(BaseModel):
 
 
     collection: ClassVar[AsyncIOMotorCollection] = db.users
+    
+    @classmethod
+    async def find_user_by_username(cls, username: str):
+        username = username.lower()
+        user_data = await cls.collection.find_one({"username": username})
+        if user_data:
+            return cls(**user_data)
+        return None
 
     @classmethod
     async def find_user_by_telegram_id(cls, telegram_id: int):
@@ -24,6 +32,8 @@ class User(BaseModel):
 
     @classmethod
     async def create_user(cls, telegram_id: int, first_name: str, last_name: str = None, username: str = None):
+        if username:
+            username = username.lower()
         user = cls(
             telegram_id=telegram_id,
             first_name=first_name,

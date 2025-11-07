@@ -11,11 +11,13 @@ class Admin(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     username: Optional[str] = None
+    is_owner : Optional[bool] = False
 
     collection: ClassVar[AsyncIOMotorCollection] = db.admins
 
     @classmethod
     async def find_admin_by_telegram_id(cls, telegram_id: int) -> Optional["Admin"]:
+        
         data = await cls.collection.find_one({"telegram_id": telegram_id})
         if data:
             return Admin(**data)
@@ -35,6 +37,9 @@ class Admin(BaseModel):
     username: Optional[str],
     is_owner: Optional[bool] = False
 ) -> "Admin":
+        
+        if username:
+            username = username.lower()
 
         await cls.collection.insert_one({
             "telegram_id": telegram_id,

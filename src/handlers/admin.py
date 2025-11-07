@@ -4,11 +4,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from src.database.models.admin import Admin
+from src.database.models.user import User
 from src.database.models.channel import Channel
 from src.keyboards.admin import (admin_keyboard, force_join_keyboard,
                                  check_channel_type_keyboard,
                                  channel_list , channel_list_show,
-                                 back_to_channel_menu_keyboard)
+                                 back_to_channel_menu_keyboard,
+                                 admin_panel_keyboard,admin_list_remove,
+                                 )
 from src.logger import log
 
 
@@ -27,6 +30,7 @@ async def active_owner(message: types.Message):
         username= message.from_user.username,
         is_owner= True
     )
+    await message.answer("✅ شما به عنوان مالک ربات فعال شدید.")
     log.info(f"""
     \n             -------Owner activated!-------            \n
     -   telegram_id: {message.from_user.id}\n
@@ -161,3 +165,86 @@ async def show_channel_callback(callback: types.CallbackQuery):
 )
     else:
         await callback.answer("❌ کانال پیدا نشد!", show_alert=True)
+        
+@router.callback_query(F.data == "admin_panel")
+async def admin_panel_callback(callback: types.CallbackQuery):
+    is_owner = await Admin.find_admin_by_telegram_id(callback.from_user.id)
+    if is_owner.is_owner == True:
+        await callback.message.edit_text("پنل ادمین:", reply_markup=admin_panel_keyboard)
+    else:
+        await callback.answer("فقط مالک ربات به این پنل دسترسی دارد.", show_alert=True)
+
+class AddAdminState(StatesGroup):
+    waiting_for_telegram_id = State()
+@router.callback_query(F.data == "add_admin")
+async def add_admin_callback(callback: types.CallbackQuery , state: FSMContext):
+    await callback.message.edit_text("لطفا آیدی تلگرام کاربر را ارسال کنید تا به عنوان ادمین اضافه شود.")
+    await state.set_state(AddAdminState.waiting_for_telegram_id)
+    
+@router.message(AddAdminState.waiting_for_telegram_id)
+async def handle_add_admin(message: types.Message, state: FSMContext):
+    id = message.text.strip()
+    if not id.isdigit():
+        user = await User.find_user_by_username(message.text.strip().lstrip("@"))
+        if not user:
+            return await message.answer("کاربر با این آیدی یا یوزرنیم پیدا نشد. لطفا دوباره امتحان کنید.")
+        await Admin.create_admin(
+            telegram_id= user.telegram_id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+            is_owner=False
+        )
+        await message.answer(f"✅ کاربر @{user.username} به عنوان ادمین اضافه شد.")
+        await state.clear()
+    elif id.isdigit():
+        telegram_id = int(id)
+        user = await User.find_user_by_telegram_id(telegram_id)
+        if not user:
+            return await message.answer("کاربر با این آیدی یا یوزرنیم پیدا نشد. لطفا دوباره امتحان کنید.")
+        await Admin.create_admin(
+            telegram_id= user.telegram_id,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            username=user.username,
+            is_owner=False
+        )
+        await message.answer(f"✅ کاربر @{user.username} به عنوان ادمین اضافه شد.")
+        await state.clear()
+    else:
+        return await message.answer("کاربر با این آیدی یا یوزرنیم پیدا نشد. لطفا دوباره امتحان کنید.")
+    
+@router.callback_query(F.data == "remove_admin")
+async def remove_admin_callback(callback: types.CallbackQuery):
+    await callback.message.edit_text("لطفا ادمینی که میخواهید حذف کنید را انتخاب کنید" , reply_markup=await admin_list_remove())
+        
+@router.callback_query(F.data.startswith("remove_admin_"))
+async def confirm_remove_admin_callback(callback: types.CallbackQuery):
+    telegram_id = int(callback.data.split("_")[2])
+    await callback.message.edit_text(
+        f"آیا از حذف این ادمین مطمئن هستید؟\nTelegram ID: `{telegram_id}`",
+        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[
+            [
+                types.InlineKeyboardButton(text="✅ بله", callback_data=f"confirm_remove_admin_{telegram_id}"),
+                types.InlineKeyboardButton(text="❌ خیر", callback_data="back_to_admin_panel")
+            ]
+        ]))
+@router.callback_query(F.data.startswith("confirm_remove_admin_"))
+async def perform_remove_admin_callback(callback: types.CallbackQuery):
+    telegram_id = int(callback.data.split("_")[3])
+    await Admin.collection.delete_one({"telegram_id": telegram_id})
+    await callback.message.edit_text("✅ ادمین با موفقیت حذف شد!")
+    
+    
+@router.callback_query(F.data == "list_admins")
+async def list_admins_callback(callback: types.CallbackQuery):
+    admins = await Admin.get_all_admins()
+    if not admins:
+        return await callback.message.edit_text("هیچ ادمینی وجود ندارد.", reply_markup=back_to_channel_menu_keyboard)
+    
+    text = "<b>لیست ادمین‌ها:</b>\n\n"
+    for admin in admins:
+        display_name = f"@{admin.username}" if admin.username else str(admin.telegram_id)
+        text += f"- {display_name} (ID: <code>{admin.telegram_id}</code>)\n"
+    
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=back_to_channel_menu_keyboard)
