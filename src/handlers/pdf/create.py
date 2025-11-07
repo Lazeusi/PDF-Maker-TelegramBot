@@ -1,6 +1,7 @@
 from aiogram import Router, types, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.filters import Command
 import os
 from pathlib import Path
 import tempfile, os
@@ -152,4 +153,8 @@ async def cb_pdf_build(callback: types.CallbackQuery, state: FSMContext, bot: Bo
     await callback.message.edit_text("📁 PDF ساخته شد و برای شما ارسال شد.", reply_markup=pdf_main_kb())
     await state.set_state(PDFStates.choosing_action)
 
+@router.message(Command("cancel"))
+async def cmd_cancel(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.edit_text("❌ ساخت PDF لغو شد.")
 
