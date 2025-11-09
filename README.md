@@ -111,6 +111,7 @@ Inside the panel, you can: **Add or remove admins**, **Manage forced-join channe
 
 Shayan
 > Python Developer — Focused on Aiogram, FastAPI, and automation projects.
+
  | 🔗 GitHub: github.com/Lazeusi
  | 🐍 Telegram: @lazeusi
 
