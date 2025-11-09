@@ -77,8 +77,9 @@ DB_NAME=PDF_MAKER_DB
 ## 🏁 Run the Bot
 ```
 python main.py
-👑 Owner Activation
 ```
+## 👑 Owner Activation
+
 Send the command: `/active_owner`
 Then access the admin panel with: `/admin`
 
